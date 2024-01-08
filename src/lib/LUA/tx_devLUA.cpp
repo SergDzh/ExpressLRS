@@ -43,7 +43,7 @@ static struct luaItem_selection luaAirRate = {
 static struct luaItem_selection luaTlmRate = {
     {"Telem Ratio", CRSF_TEXT_SELECTION},
     0, // value
-    "Std;Off;1:128;1:64;1:32;1:16;1:8;1:4;1:2;Race",
+    "Std;Off;1:128;1:64;1:32;1:16;1:8;1:4;1:2;MAVLink;Race",
     tlmBandwidth
 };
 
@@ -296,12 +296,13 @@ static void luadevUpdateModelID() {
 static void luadevUpdateTlmBandwidth()
 {
   expresslrs_tlm_ratio_e eRatio = (expresslrs_tlm_ratio_e)config.GetTlm();
-  // TLM_RATIO_STD / TLM_RATIO_DISARMED
-  if (eRatio == TLM_RATIO_STD || eRatio == TLM_RATIO_DISARMED)
+  // TLM_RATIO_STD / TLM_RATIO_DISARMED / TLM_RATIO_MAVLINK
+  if (eRatio == TLM_RATIO_STD || eRatio == TLM_RATIO_DISARMED || eRatio == TLM_RATIO_MAVLINK)
   {
     // For Standard ratio, display the ratio instead of bps
     strcpy(tlmBandwidth, " (1:");
     uint8_t ratioDiv = TLMratioEnumToValue(ExpressLRS_currAirRate_Modparams->TLMinterval);
+    ratioDiv = eRatio == TLM_RATIO_MAVLINK ? 2 : ratioDiv; // MAVLink forces 1:2 ratio
     itoa(ratioDiv, &tlmBandwidth[4], 10);
     strcat(tlmBandwidth, ")");
   }
@@ -573,12 +574,17 @@ static void registerLuaParameters()
     {
       uint8_t selectedRate = RATE_MAX - 1 - arg;
       uint8_t actualRate = adjustPacketRateForBaud(selectedRate);
+      uint8_t packetSize = get_elrs_airRateConfig(actualRate)->PayloadLength;
       uint8_t newSwitchMode = adjustSwitchModeForAirRate(
-        (OtaSwitchMode_e)config.GetSwitchMode(), get_elrs_airRateConfig(actualRate)->PayloadLength);
+        (OtaSwitchMode_e)config.GetSwitchMode(), packetSize);
       // If the switch mode is going to change, block the change while connected
       if (newSwitchMode == OtaSwitchModeCurrent || connectionState == disconnected)
       {
         config.SetRate(actualRate);
+        if (config.GetTlm() == TLM_RATIO_MAVLINK && packetSize != OTA8_PACKET_SIZE)
+        {
+          newSwitchMode = 1; // Force Hybrid switch mode
+        }
         config.SetSwitchMode(newSwitchMode);
         if (actualRate != selectedRate)
         {
@@ -593,8 +599,23 @@ static void registerLuaParameters()
       expresslrs_tlm_ratio_e eRatio = (expresslrs_tlm_ratio_e)arg;
       if (eRatio <= TLM_RATIO_DISARMED)
       {
+        // Restart if ratio changed to/from TLM_MAVLINK_RATIO to enable/disable TX MAVLink mode
+        if (eRatio == TLM_RATIO_MAVLINK || config.GetTlm() == TLM_RATIO_MAVLINK)
+        {
+          if (connectionState == disconnected)
+          {
+            if (eRatio == TLM_RATIO_MAVLINK && !OtaIsFullRes)
+              config.SetSwitchMode(1); // Force Hybrid switch mode
+            config.SetTlm(eRatio);
+            config.Commit();
+            delayMicroseconds(10000);
+            ESP.restart();
+          }
+          else
+            setLuaWarningFlag(LUA_FLAG_ERROR_CONNECTED, true);
+        }
         // Don't allow TLM ratio changes if using AIRPORT
-        if (!firmwareOptions.is_airport)
+        else if (!firmwareOptions.is_airport)
         {
           config.SetTlm(eRatio);
         }
@@ -613,6 +634,10 @@ static void registerLuaParameters()
         // the pack and unpack functions are matched
         if (connectionState == disconnected)
         {
+          if (config.GetTlm() == TLM_RATIO_MAVLINK && !OtaIsFullRes)
+          {
+            arg = 1; // Force Hybrid switch mode
+          }
           config.SetSwitchMode(arg);
           OtaUpdateSerializers((OtaSwitchMode_e)arg, ExpressLRS_currAirRate_Modparams->PayloadLength);
         }
@@ -780,10 +805,22 @@ static int event()
     return DURATION_NEVER;
   }
   uint8_t currentRate = adjustPacketRateForBaud(config.GetRate());
+  expresslrs_tlm_ratio_e currentTlm = (expresslrs_tlm_ratio_e)config.GetTlm();
   setLuaTextSelectionValue(&luaAirRate, RATE_MAX - 1 - currentRate);
-  setLuaTextSelectionValue(&luaTlmRate, config.GetTlm());
-  setLuaTextSelectionValue(&luaSwitch, config.GetSwitchMode());
-  luaSwitch.options = OtaIsFullRes ? switchmodeOpts8ch : switchmodeOpts4ch;
+  setLuaTextSelectionValue(&luaTlmRate, currentTlm);
+
+  // If using MAVLink tlm ratio and not full res only display Hybrid switch mode
+  if (!OtaIsFullRes && (currentTlm == TLM_RATIO_MAVLINK))
+  {
+    setLuaTextSelectionValue(&luaSwitch, 0);
+    luaSwitch.options = "Hybrid";
+  }
+  else
+  {
+    setLuaTextSelectionValue(&luaSwitch, config.GetSwitchMode());
+    luaSwitch.options = OtaIsFullRes ? switchmodeOpts8ch : switchmodeOpts4ch;
+  }
+
   if (isDualRadio())
   {
     setLuaTextSelectionValue(&luaAntenna, config.GetAntennaMode());

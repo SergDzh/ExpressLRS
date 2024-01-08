@@ -35,8 +35,8 @@ Stream *TxUSB;
 FIFO<AP_MAX_BUF_LEN> apInputBuffer;
 FIFO<AP_MAX_BUF_LEN> apOutputBuffer;
 
-// TODO: Remove this! Manual define for mavlink mode on TX
-bool mavlinkTX = true;
+// Variables / constants for MAVLink //
+bool mavlinkTX = false;
 uint8_t mavBuffer[64];
 
 #if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
@@ -279,6 +279,10 @@ expresslrs_tlm_ratio_e ICACHE_RAM_ATTR UpdateTlmRatioEffective()
   else if (ratioConfigured != TLM_RATIO_STD)
   {
     retVal = ratioConfigured;
+  }
+  else if (ratioConfigured == TLM_RATIO_MAVLINK)
+  {
+    retVal = TLM_RATIO_1_2;
   }
 
   if (updateTelemDenom)
@@ -1246,6 +1250,13 @@ void setup()
   if (setupHardwareFromOptions())
   {
     initUID();
+
+    eeprom.Begin(); // Init the eeprom
+    config.SetStorageProvider(&eeprom); // Pass pointer to the Config class for access to storage
+    config.Load(); // Load the stored values from eeprom
+
+    mavlinkTX = config.GetTlm() == TLM_RATIO_MAVLINK ? true : false;
+
     setupTarget();
     // Register the devices with the framework
     devicesRegister(ui_devices, ARRAY_SIZE(ui_devices));
@@ -1265,12 +1276,6 @@ void setup()
     }
     CRSF::RecvModelUpdate = &ModelUpdateReq;
     DBGLN("ExpressLRS TX Module Booted...");
-
-    eeprom.Begin(); // Init the eeprom
-    config.SetStorageProvider(&eeprom); // Pass pointer to the Config class for access to storage
-    config.Load(); // Load the stored values from eeprom
-
-    config.SetTlm(TLM_RATIO_1_2);
 
     Radio.currFreq = GetInitialFreq(); //set frequency first or an error will occur!!!
     #if defined(RADIO_SX127X)
