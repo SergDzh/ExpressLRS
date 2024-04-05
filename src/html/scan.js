@@ -384,6 +384,7 @@ function updateConfig(data, options) {
     _('bindphrase').style.display = _('vbind').checked ? 'none' : 'block';
   }
   _('vbind').onchange();
+  _('IR-protocol').value = data['IR-protocol'];
 @@end
 @@if isTX:
   if (data.hasOwnProperty['button-colors']) {
@@ -687,6 +688,7 @@ if (_('config')) {
           "pwm": getPwmFormData(),
           "serial-protocol": +_('serial-protocol').value,
           "sbus-failsafe": +_('sbus-failsafe').value,
+          "IR-protocol": +_('IR-protocol').value,
           "modelid": +_('modelid').value,
           "force-tlm": +_('force-tlm').checked,
           "vbind": +_('vbind').checked,
