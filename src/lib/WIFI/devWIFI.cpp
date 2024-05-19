@@ -2,6 +2,8 @@
 
 #if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
 
+#define ARDUINOJSON_USE_LONG_LONG 1
+
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
 #if defined(PLATFORM_ESP8266)
@@ -359,6 +361,8 @@ static void GetConfiguration(AsyncWebServerRequest *request)
     #if defined(TARGET_RX)
     json["config"]["serial-protocol"] = config.GetSerialProtocol();
     json["config"]["sbus-failsafe"] = config.GetFailsafeMode();
+    json["config"]["IR-protocol"] = config.GetIRProtocol();
+    json["config"]["IR-ilapcode-config"] = config.GetIRiLapCode();
     json["config"]["modelid"] = config.GetModelId();
     json["config"]["force-tlm"] = config.GetForceTlmOff();
     json["config"]["vbind"] = config.GetVolatileBind();
@@ -505,6 +509,12 @@ static void UpdateConfiguration(AsyncWebServerRequest *request, JsonVariant &jso
 
   uint8_t failsafe = json["sbus-failsafe"] | 0;
   config.SetFailsafeMode((eFailsafeMode)failsafe);
+
+  uint8_t IRprotocol = json["IR-protocol"] | 0;
+  config.SetIRProtocol((eIRProtocol)IRprotocol);
+
+  uint64_t IRiLapCode = ((uint64_t)json["IR-ilapcode-config"]) | 0;
+  config.SetIRiLapCode(IRiLapCode);
 
   long modelid = json["modelid"] | 255;
   if (modelid < 0 || modelid > 63) modelid = 255;

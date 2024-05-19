@@ -384,6 +384,13 @@ function updateConfig(data, options) {
     _('bindphrase').style.display = _('vbind').checked ? 'none' : 'block';
   }
   _('vbind').onchange();
+  _('IR-protocol').value = data['IR-protocol'];
+  _('IR-protocol').onchange = () => {
+    _('IR-ilapcode-config').style.display = _('IR-protocol').value == 2 ? 'block' : 'none';
+  }
+  _('IR-protocol').onchange();
+  var iLapCode = data['IR-ilapcode-config'].toString(16).toUpperCase().substring(0, 12).padStart(12, "0");
+  _('IR-ilapcode').value = iLapCode
 @@end
 @@if isTX:
   if (data.hasOwnProperty['button-colors']) {
@@ -687,6 +694,8 @@ if (_('config')) {
           "pwm": getPwmFormData(),
           "serial-protocol": +_('serial-protocol').value,
           "sbus-failsafe": +_('sbus-failsafe').value,
+          "IR-protocol": +_('IR-protocol').value,
+          "IR-ilapcode-config": parseInt(_('IR-ilapcode').value, 16),
           "modelid": +_('modelid').value,
           "force-tlm": +_('force-tlm').checked,
           "vbind": +_('vbind').checked,

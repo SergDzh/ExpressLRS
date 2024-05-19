@@ -220,6 +220,9 @@ typedef struct __attribute__((packed)) {
     uint8_t     teamraceChannel:4,
                 teamracePosition:3,
                 teamracePitMode:1;  // FUTURE: Enable pit mode when disabling model
+    uint8_t     IRProtocol:3,       // see enum eIRProtocol
+                IRunused:5;           
+    uint64_t    IRiLapCode;         // iLap transponder code
 } rx_config_t;
 
 class RxConfig
@@ -247,6 +250,8 @@ public:
     uint8_t GetTeamraceChannel() const { return m_config.teamraceChannel; }
     uint8_t GetTeamracePosition() const { return m_config.teamracePosition; }
     eFailsafeMode GetFailsafeMode() const { return (eFailsafeMode)m_config.failsafeMode; }
+    eIRProtocol GetIRProtocol() const { return (eIRProtocol)m_config.IRProtocol; }
+    uint64_t GetIRiLapCode() const { return m_config.IRiLapCode; }
     bool GetVolatileBind() const { return m_config.volatileBind; }
 
     // Setters
@@ -267,6 +272,8 @@ public:
     void SetTeamraceChannel(uint8_t teamraceChannel);
     void SetTeamracePosition(uint8_t teamracePosition);
     void SetFailsafeMode(eFailsafeMode failsafeMode);
+    void SetIRProtocol(eIRProtocol IRProtocol);
+    void SetIRiLapCode(uint64_t IRiLapCode); 
     void SetVolatileBind(bool value);
 
 private:
